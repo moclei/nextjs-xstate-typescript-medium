@@ -1,234 +1,187 @@
-import { assign, createMachine } from "xstate";
-
-if (typeof window !== "undefined") {
-    // Uncomment and set devTools to true in the hook to
-    // see the debug inspector
-    /*  inspect({
-      iframe: false,
-    });*/
-}
-
-enum PageStatus {
-    UP = "UP",
-    DOWN = "DOWN",
-    NO_CHANGE = "NO_CHANGE",
-}
-
-export enum SearchType {
-    APPEND,
-    REPLACE,
-}
-
-export interface SearchMachineContext {
-    searchTerm?: string;
-    page: number;
-    prevPage?: number;
-    searchResults?: any[];
-    error?: Error;
-    loading?: boolean;
-    pageStatus?: any;
-    searchType?: SearchType;
-}
-
-type SearchStateEvents = {
-    type: "RUN_SEARCH";
-    searchTerm?: string;
-    page?: number;
-}
-
-export type SearchTypestate =
-    | {
-    value: "idle";
-    context: SearchMachineContext;
-}
-    | {
-    value: "runningSearch";
-    context: SearchMachineContext;
-}
-    | {
-    value: "loading";
-    context: SearchMachineContext;
-}
-    | {
-    value: "error";
-    context: SearchMachineContext;
-};
-
-export const searchMachine = createMachine<
+import React, { createContext, useCallback, useEffect } from "react";
+import { useInterpret } from "@xstate/react";
+import { InterpreterFrom } from "xstate";
+import {
+    searchMachine,
     SearchMachineContext,
-    any,
-    SearchTypestate
-    >(
-    {
-        id: "search",
-        preserveActionOrder: true,
-        schema: {
-            context: {
-                page: 0,
-                prevPage: 0,
-                loading: false,
-                searchResults: []
-            } as SearchMachineContext,
-            events: {} as SearchStateEvents,
-        },
-        initial: "idle",
-        states: {
-            idle: {
-                entry: ["notifyIdleEntry"],
-                exit: ["notifyIdleExit"],
-                on: {
-                    RUN_SEARCH: {
-                        target: ["searching"],
-                        actions: [
-                            assign({
-                                searchType: (ctx, evt) => SearchType.REPLACE,
-                            }),
-                            assign({
-                                searchTerm: (ctx, evt) => {
-                                    return (
-                                        evt.searchTerm || (evt.entityId ? null : ctx.searchTerm)
-                                    );
-                                },
-                                page: (ctx, evt) => 0,
-                            }),
-                        ],
-                    },
-                    RUN_PAGE: {
-                        target: ["searching"],
-                        actions: [
-                            assign({
-                                searchType: (ctx, evt) => SearchType.APPEND,
-                            }),
-                            assign({
-                                prevPage: (ctx, evt) => ctx.page,
-                            }),
-                            assign({
-                                page: (ctx, evt) => evt.page || ctx.page + 1,
-                            }),
-                            assign({
-                                pageStatus: (ctx, evt) => {
-                                    const page = evt.page || ctx.page;
-                                    const prevPage = (evt.page ? ctx.page : ctx.prevPage) || page;
-                                    if (page > prevPage) {
-                                        return PageStatus.UP;
-                                    }
-                                    if (page < prevPage) {
-                                        return PageStatus.DOWN;
-                                    }
-                                    return PageStatus.NO_CHANGE;
-                                },
-                            }),
-                        ],
-                    },
-                },
-            },
-            searching: {
-                initial: "pending",
-                states: {
-                    pending: {
-                        entry: [
-                            "notifySearchPendingEntry",
-                            assign({
-                                loading: (ctx, evt) => true,
-                            }),
-                        ],
-                        exit: ["notifySearchPendingExit"],
-                        invoke: {
-                            src: "doRunSearch",
-                            onDone: {
-                                target: "success",
-                                actions: [
-                                    assign({
-                                        pageStatus: (ctx, evt) => {
-                                            return evt.type === "done.invoke.doRunSearch"
-                                                ? PageStatus.NO_CHANGE
-                                                : ctx.pageStatus;
-                                        },
-                                    }),
-                                    assign({
-                                        searchResults: (ctx, evt) => {
-                                            return ctx.searchType === SearchType.APPEND
-                                                ? [...[ctx.searchResults || []], ...evt.data.page]
-                                                : evt.data.page;
-                                        },
-                                        loading: (ctx, evt) => false,
-                                    }),
-                                ],
-                            },
-                            onError: {
-                                target: "#search.error",
-                            },
-                        },
-                    },
-                    success: {
-                        entry: ["notifySearchSuccessEntry"],
-                        exit: ["notifySearchSuccessExit"],
-                        always: [{ target: "#search.idle"}],
-                    },
-                },
-            },
-            error: {
-                on: {
-                    RESET: {
-                        target: "#search.idle",
-                    },
-                },
-            },
-        },
-    },
-    {
-        actions: {
-            activate: (context, event) => {
-                // console.log("activating filters...");
-            },
-            notifyActive: (context, event) => {
-                // console.log("active!");
-            },
-            notifyTransition: (context, event) => {
-                // console.log("notifyTransition, evt: ", event);
-            },
-            notifyEntry: (context, event) => {
-                // console.log("notifyEntry, evt: ", event);
-            },
-            notifyExit: (context, event) => {
-                // console.log("notifyExit, evt: ", event);
-            },
-            notifyFiltersPendingEntry: (context, event) => {
-                // console.log("notifyFiltersPendingEntry, evt: ", event);
-            },
-            notifyFiltersPendingExit: (context, event) => {
-                // console.log("notifyFiltersPendingExit, evt: ", event);
-            },
-            notifyFiltersSuccessEntry: (context, event) => {
-                // console.log("notifyFiltersSuccessEntry, evt: ", event);
-            },
-            notifyFiltersSuccessExit: (context, event) => {
-                // console.log("notifyFiltersSuccessExit, evt: ", event);
-            },
+    SearchType,
+    SearchTypestate,
+} from "../machines/searchMachine";
+import { useRouter } from "next/router";
 
-            notifySearchPendingEntry: (context, event) => {
-                // console.log("notifySearchPendingEntry, evt: ", event);
-            },
-            notifySearchPendingExit: (context, event) => {
-                // console.log("notifySearchPendingExit, evt: ", event);
-            },
-            notifySearchSuccessEntry: (context, event) => {
-                // console.log("notifySearchSuccessEntry, evt: ", event);
-            },
-            notifySearchSuccessExit: (context, event) => {
-                // console.log("notifySearchSuccessExit, evt: ", event);
-            },
-            notifyIdleEntry: (context, event) => {
-                // console.log("notifyIdleEntry, evt: ", event);
-            },
-            notifyIdleExit: (context, event) => {
-                // console.log("notifyIdleExit, evt: ", event);
-            },
+export const resultsSelector = (state: SearchTypestate) => {
+    return state.context.searchResults;
+};
+export const loadingSelector = (state: SearchTypestate) => {
+    return state.context.loading;
+};
+export const errorSelector = (state: SearchTypestate) => {
+    return state.context.error;
+};
+export const searchTermSelector = (state: SearchTypestate) => {
+    return state.context.searchTerm;
+};
+export const pageNumSelector = (state: SearchTypestate) => {
+    return state.context.page;
+};
+export const SearchStateContext = createContext({
+    searchService: {} as InterpreterFrom<typeof searchMachine>,
+    runSearch: (
+        searchTerm?: string,
+        page?: number,
+    ) => {},
+    runPage: (pageNum?: number) => {},
+    setSearchContext: (searchContext: {
+        searchTerm?: string;
+        searchResults?: any[];
+        page?: number;
+    }) => {},
+});
+
+interface SearchProviderProps {
+    children?: React.ReactNode;
+}
+
+export const SearchStateProvider = (props: SearchProviderProps) => {
+    const client = useApolloClient();
+    const router = useRouter();
+
+    const createSearchVars = (context: SearchMachineContext) => {
+        const filters = [
+            ...groupAndMapFilters(context.activeFilters),
+            ...resolveClientSideDefaultFilters(config, locationData),
+        ];
+        const varPageSize = context.entityType === EntityType.BEVERAGES ? 10 : 20;
+        const pageOffset =
+            context.searchType === SearchType.REPLACE
+                ? 0
+                : context.page * varPageSize;
+        const pageSize =
+            context.searchType === SearchType.REPLACE
+                ? (context.page + 1) * varPageSize
+                : varPageSize;
+        const queryData = queryVariables[context.entityType];
+        if (context.entityType === EntityType.SEARCH) {
+            queryData.variables = {
+                searchQuery: {
+                    search: context.searchTerm,
+                    aggSizes: FILTER_AGGS,
+                    filters,
+                    page: {
+                        offset: pageOffset,
+                        size: pageSize,
+                    },
+                    sort: context.sort,
+                },
+            };
+            if (locationData && locationData.lat && locationData.lon) {
+                queryData.variables.searchQuery.geoPoint = {
+                    lat: locationData?.lat,
+                    lon: locationData?.lon,
+                };
+            }
+        } else {
+            queryData.variables = {
+                [VariablesNames[context.entityType]]: {
+                    identifier: {
+                        entityUuid: context.entityId as string,
+                    },
+                    query: {
+                        filters,
+                        page: {
+                            offset: pageOffset,
+                            size: pageSize,
+                        },
+                        sort: context.sort,
+                    },
+                },
+            };
+            if (locationData && locationData.lat && locationData.lon) {
+                queryData.variables[
+                    VariablesNames[context.entityType]
+                    ].query.geoPoint = { lat: locationData?.lat, lon: locationData?.lon };
+            }
+        }
+        return queryData;
+    };
+
+    const doRunSearch = (context: SearchMachineContext) => {
+        const queryData = createSearchVars(context);
+
+        return Promise.all([
+            client
+                .query<Query, QuerySearchArgs | QueryArgs>({
+                    query: queryData.query,
+                    variables: queryData.variables,
+                })
+                .catch((error: ApolloError) => {
+                    searchService.send({ type: "SEARCH_ERROR", error: error });
+                }),
+        ]).then((results) => {
+            const dataField = queryVariables[context.entityType].dataField;
+            if (queryData.entityKey && context.entityType !== EntityType.SEARCH) {
+                const responseData = (results[0] as ApolloQueryResult<Query>).data[
+                    dataField
+                    ] as any;
+                const collectionData =
+                    (results[1] as ApolloQueryResult<Query>).data?.getCollectionsForEntity
+                        ?.collections || [];
+                return {
+                    entityMatchData: responseData[queryData.entityKey],
+                    page: responseData.results.page,
+                    totalResults: responseData.results.totalResults,
+                    buyingModalities: responseData.buyingModalities,
+                    similar: responseData.similar,
+                    curatedPix: collectionData,
+                };
+            }
+            return (results[0] as ApolloQueryResult<Query>).data[dataField] as any;
+        });
+    };
+
+    const searchService = useInterpret(searchMachine, {
+        devTools: false,
+        services: { doRunSearch },
+    });
+    useEffect(() => {
+        if (searchService?.state?.matches("error")) {
+            searchService.send({ type: "RESET" });
+        }
+    }, [searchService]);
+
+    const runSearch = useCallback(
+        (
+            searchTerm?: string,
+            page?: number
+        ) => {
+            searchService.send({
+                type: "RUN_SEARCH",
+                searchTerm: searchTerm,
+                page: page,
+            });
         },
-        guards: {
-            isSearchDone: (context, event) => {
-                return context.loading === false;
-            },
+        [searchService]
+    );
+
+    const runPage = useCallback(
+        (pageNum?: number) => {
+            searchService.send({
+                type: "RUN_PAGE",
+                page: pageNum,
+            });
         },
-    }
-);
+        [searchService]
+    );
+
+    return (
+        <SearchStateContext.Provider
+            value={{
+                searchService,
+                runSearch,
+                runPage,
+            }}
+        >
+            {props.children}
+        </SearchStateContext.Provider>
+    );
+};
