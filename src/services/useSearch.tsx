@@ -8,6 +8,7 @@ import {
     SearchTypestate,
 } from "../machines/searchMachine";
 import { useRouter } from "next/router";
+import useAxios from "axios-hooks";
 
 export const resultsSelector = (state: SearchTypestate) => {
     return state.context.searchResults;
@@ -31,113 +32,45 @@ export const SearchStateContext = createContext({
         page?: number,
     ) => {},
     runPage: (pageNum?: number) => {},
-    setSearchContext: (searchContext: {
-        searchTerm?: string;
-        searchResults?: any[];
-        page?: number;
-    }) => {},
 });
 
 interface SearchProviderProps {
     children?: React.ReactNode;
 }
 
+const options = {
+    method: 'GET',
+    url: 'https://demotivational-quotes.p.rapidapi.com/api/quotes/all',
+    headers: {
+        'X-RapidAPI-Host': 'demotivational-quotes.p.rapidapi.com',
+        'X-RapidAPI-Key': '537efa8ffemsh9337946a5d4e116p1c9148jsnb1553b92d823'
+    }
+};
+
 export const SearchStateProvider = (props: SearchProviderProps) => {
-    const client = useApolloClient();
     const router = useRouter();
+    const [
+        { data, loading: wordsLoading, error: wordsError },
+        executeWordSearch
+    ] = useAxios(
+        options,
+        { manual: true }
+    )
 
-    const createSearchVars = (context: SearchMachineContext) => {
-        const filters = [
-            ...groupAndMapFilters(context.activeFilters),
-            ...resolveClientSideDefaultFilters(config, locationData),
-        ];
-        const varPageSize = context.entityType === EntityType.BEVERAGES ? 10 : 20;
-        const pageOffset =
-            context.searchType === SearchType.REPLACE
-                ? 0
-                : context.page * varPageSize;
-        const pageSize =
-            context.searchType === SearchType.REPLACE
-                ? (context.page + 1) * varPageSize
-                : varPageSize;
-        const queryData = queryVariables[context.entityType];
-        if (context.entityType === EntityType.SEARCH) {
-            queryData.variables = {
-                searchQuery: {
-                    search: context.searchTerm,
-                    aggSizes: FILTER_AGGS,
-                    filters,
-                    page: {
-                        offset: pageOffset,
-                        size: pageSize,
-                    },
-                    sort: context.sort,
-                },
-            };
-            if (locationData && locationData.lat && locationData.lon) {
-                queryData.variables.searchQuery.geoPoint = {
-                    lat: locationData?.lat,
-                    lon: locationData?.lon,
-                };
-            }
-        } else {
-            queryData.variables = {
-                [VariablesNames[context.entityType]]: {
-                    identifier: {
-                        entityUuid: context.entityId as string,
-                    },
-                    query: {
-                        filters,
-                        page: {
-                            offset: pageOffset,
-                            size: pageSize,
-                        },
-                        sort: context.sort,
-                    },
-                },
-            };
-            if (locationData && locationData.lat && locationData.lon) {
-                queryData.variables[
-                    VariablesNames[context.entityType]
-                    ].query.geoPoint = { lat: locationData?.lat, lon: locationData?.lon };
-            }
-        }
-        return queryData;
+    async function doRunSearch(context: SearchMachineContext) {
+        const data = await executeWordSearch();
+        console.debug("doRunSearch, data: ", data);
+        return data;
     };
-
-    const doRunSearch = (context: SearchMachineContext) => {
-        const queryData = createSearchVars(context);
-
-        return Promise.all([
-            client
-                .query<Query, QuerySearchArgs | QueryArgs>({
-                    query: queryData.query,
-                    variables: queryData.variables,
-                })
-                .catch((error: ApolloError) => {
-                    searchService.send({ type: "SEARCH_ERROR", error: error });
-                }),
-        ]).then((results) => {
-            const dataField = queryVariables[context.entityType].dataField;
-            if (queryData.entityKey && context.entityType !== EntityType.SEARCH) {
-                const responseData = (results[0] as ApolloQueryResult<Query>).data[
-                    dataField
-                    ] as any;
-                const collectionData =
-                    (results[1] as ApolloQueryResult<Query>).data?.getCollectionsForEntity
-                        ?.collections || [];
-                return {
-                    entityMatchData: responseData[queryData.entityKey],
-                    page: responseData.results.page,
-                    totalResults: responseData.results.totalResults,
-                    buyingModalities: responseData.buyingModalities,
-                    similar: responseData.similar,
-                    curatedPix: collectionData,
-                };
-            }
-            return (results[0] as ApolloQueryResult<Query>).data[dataField] as any;
-        });
-    };
+    useEffect(() => {
+        console.debug("data: ", data);
+    }, [data])
+    useEffect(() => {
+        console.debug("wordsLoading: ", wordsLoading);
+    }, [wordsLoading])
+    useEffect(() => {
+        console.debug("wordsError: ", wordsError);
+    }, [wordsError])
 
     const searchService = useInterpret(searchMachine, {
         devTools: false,

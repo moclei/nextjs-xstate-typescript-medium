@@ -147,6 +147,7 @@ export const searchMachine = createMachine<
                                     }),
                                     assign({
                                         searchResults: (ctx, evt) => {
+                                            console.debug("doRunSearch, assigning searchResults");
                                             return ctx.searchType === SearchType.APPEND
                                                 ? [...[ctx.searchResults || []], ...evt.data.page]
                                                 : evt.data.page;
@@ -179,50 +180,50 @@ export const searchMachine = createMachine<
     {
         actions: {
             activate: (context, event) => {
-                // console.log("activating filters...");
+               console.log("activating filters...");
             },
             notifyActive: (context, event) => {
-                // console.log("active!");
+               console.log("active!");
             },
             notifyTransition: (context, event) => {
-                // console.log("notifyTransition, evt: ", event);
+               console.log("notifyTransition, evt: ", event);
             },
             notifyEntry: (context, event) => {
-                // console.log("notifyEntry, evt: ", event);
+               console.log("notifyEntry, evt: ", event);
             },
             notifyExit: (context, event) => {
-                // console.log("notifyExit, evt: ", event);
+               console.log("notifyExit, evt: ", event);
             },
             notifyFiltersPendingEntry: (context, event) => {
-                // console.log("notifyFiltersPendingEntry, evt: ", event);
+               console.log("notifyFiltersPendingEntry, evt: ", event);
             },
             notifyFiltersPendingExit: (context, event) => {
-                // console.log("notifyFiltersPendingExit, evt: ", event);
+               console.log("notifyFiltersPendingExit, evt: ", event);
             },
             notifyFiltersSuccessEntry: (context, event) => {
-                // console.log("notifyFiltersSuccessEntry, evt: ", event);
+               console.log("notifyFiltersSuccessEntry, evt: ", event);
             },
             notifyFiltersSuccessExit: (context, event) => {
-                // console.log("notifyFiltersSuccessExit, evt: ", event);
+               console.log("notifyFiltersSuccessExit, evt: ", event);
             },
 
             notifySearchPendingEntry: (context, event) => {
-                // console.log("notifySearchPendingEntry, evt: ", event);
+               console.log("notifySearchPendingEntry, evt: ", event);
             },
             notifySearchPendingExit: (context, event) => {
-                // console.log("notifySearchPendingExit, evt: ", event);
+               console.log("notifySearchPendingExit, evt: ", event);
             },
             notifySearchSuccessEntry: (context, event) => {
-                // console.log("notifySearchSuccessEntry, evt: ", event);
+               console.log("notifySearchSuccessEntry, evt: ", event);
             },
             notifySearchSuccessExit: (context, event) => {
-                // console.log("notifySearchSuccessExit, evt: ", event);
+               console.log("notifySearchSuccessExit, evt: ", event);
             },
             notifyIdleEntry: (context, event) => {
-                // console.log("notifyIdleEntry, evt: ", event);
+               console.log("notifyIdleEntry, evt: ", event);
             },
             notifyIdleExit: (context, event) => {
-                // console.log("notifyIdleExit, evt: ", event);
+               console.log("notifyIdleExit, evt: ", event);
             },
         },
         guards: {
