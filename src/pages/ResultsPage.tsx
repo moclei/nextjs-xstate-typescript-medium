@@ -1,10 +1,8 @@
 import React, { useContext, useEffect } from "react";
-import { PixBody, PixHeader } from "../components/search-component-web";
 import { useRouter } from "next/router";
-import ResultsCardList from "../components/Lists/ResultsCardList";
 import { useSelector } from "@xstate/react";
 import { resultsSelector, loadingSelector, searchTermSelector, SearchStateContext } from "../services/useSearch";
-import styles from '../styles/Results.module.css'
+import styles from '../../styles/Results.module.css'
 
 export interface ResultsPageProps {
     serverData: {
@@ -22,22 +20,17 @@ export default function ResultsPage({
     const loading = useSelector(searchContext.searchService, loadingSelector);
     const searchTerm = useSelector(searchContext.searchService, searchTermSelector);
 
-    useEffect(() => {
-        if (serverData.results) {
-            searchContext.setSearchContext({
-                results: serverData.results,
-                searchTerm: serverData.searchTerm,
-            });
-        }
-    }, [serverData.results]);
-
     const handleNewSearch = (value: string) => {
         searchContext.runSearch(value);
     };
 
+    useEffect(() => {
+        console.debug("ResultsPage, results: ", results);
+    }, [results])
+
     const renderZeroResultsCard = () => {
         return !loading ? (
-            <div raised={false} className={styles.zeroResultsCard}>
+            <div className={styles.zeroResultsCard}>
                 <div className={styles.resultsTitleText}>
                     Wanted: wines matching “{searchTerm}”
                 </div>
@@ -52,25 +45,32 @@ export default function ResultsPage({
 
     return (
         <div className={styles.root}>
-            <PixHeader />
-            <PixBody
-                role="main"
-                ariaLabel="main filters and results"
-                marginBottom="200px"
-            >
-                <div className={styles.resultsTitleContainer}>
-                    {results.length > 0 && (
-                        <div className={styles.resultsTitleText}>
-                            We found {results.length} wine
-                            {results.length === 1 ? "" : "s"} matching “{searchTerm}”
+            {/*<PixHeader />*/}
+            <div  style={{marginBottom: "200px"}}>
+                {!results ?
+                    (
+                        <div style={{display: "flex", flexDirection: "column"}}>
+                            <div>No results</div>
+                            <input type={"button"} onClick={() => searchContext.runSearch("")}/>
                         </div>
-                    )}
-                </div>
-                <div className={styles.resultsPage}>
-                    <ResultsCardList />
-                    {results.length === 0 && renderZeroResultsCard()}
-                </div>
-            </PixBody>
+                    )
+                    :
+                    (<>
+                        <div className={styles.resultsTitleContainer}>
+                            {results?.length > 0 && (
+                                <div className={styles.resultsTitleText}>
+                                We found {results.length} wine
+                            {results?.length === 1 ? "" : "s"} matching “{searchTerm}”
+                                </div>
+                                )}
+                        </div>
+                        <div className={styles.resultsPage}>
+                            {/*<ResultsCardList />*/}
+                            {results?.length === 0 && renderZeroResultsCard()}
+                        </div>
+                    </>)
+                }
+            </div>
         </div>
     );
 }
